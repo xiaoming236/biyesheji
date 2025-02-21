@@ -119,23 +119,7 @@ void Display_Page3(void)
     OLED_ShowString(95, 0, "P:3/3", OLED_8X16);
 	
 }
-//第四页
-void Display_Page4(void)
-{
-    OLED_Clear();
-    // 显示阈值信息
-    OLED_ShowChinese(0, 0, "温度:");
-    OLED_ShowNum(64, 0, tem, 2, OLED_8X16);
 
-    OLED_ShowChinese(0, 16, "烟雾:");
-    OLED_ShowNum(64, 16, yan, 2, OLED_8X16);
-
-    OLED_ShowString(0, 32, "CO:", OLED_8X16);
-    OLED_ShowNum(64, 32, ran, 2, OLED_8X16);
-
-    // 页面指示
-    OLED_ShowString(95, 0, "P:4/4", OLED_8X16);
-}
 
 int main(void)
 {   
@@ -210,13 +194,17 @@ if(key)
             else
                 shuiguan();
             break;
+						
+				case KEY2_PRES:  // 按键3：切换远程控制模式
+            flag3 = (flag3 == 4) ? 0 : 4;  // 在普通模式和远程模式之间切换
+            break;
             
         case KEY3_PRES:  // 按键4：翻页显示
-            display_page = (display_page + 1) % 4;  // 改为4页循环
+            if(flag3 != 4)  // 非远程模式下才切换页面
+                display_page = (display_page + 1) % 3;
             break;
     }
-}
-				
+}	
 				
 				
         // 根据页面显示不同内容
@@ -231,13 +219,111 @@ if(key)
     case 2:
         Display_Page3();
         break;
-    case 3:
-        Display_Page4();  // 新增的第4页
-        break;
+   
 }
 
         
-        // 报警检测和自动控制
+// 主循环中的显示控制部分
+if(flag3 == 4)  // 远程控制模式
+{
+    OLED_Clear();
+    OLED_ShowChinese(0, 0, "远程");
+    
+    // 显示当前阈值
+    OLED_ShowChinese(0, 16, "温度:");
+    OLED_ShowNum(40, 16, tem, 2, OLED_8X16);
+    OLED_ShowString(64, 16, "C", OLED_8X16);
+    
+    OLED_ShowChinese(0, 32, "烟雾:");
+    OLED_ShowNum(40, 32, yan, 2, OLED_8X16);
+    OLED_ShowString(64, 32, "%", OLED_8X16);
+    
+    OLED_ShowString(0, 48, "CO:", OLED_8X16);
+    OLED_ShowNum(32, 48, ran, 2, OLED_8X16);
+    OLED_ShowString(56, 48, "%", OLED_8X16);
+}
+else  // 普通显示模式
+{
+    switch(display_page)
+    {
+        case 0:
+            Display_Page1();
+            break;
+        case 1:
+            Display_Page2();
+            break;
+        case 2:
+            Display_Page3();
+				    break;
+    }
+}
+
+// 远程控制处理（放在主循环中）
+if(flag3 == 4)
+{
+    // 温度阈值远程调节
+    if(wena == '1')
+    {
+        tem = tem + 1;
+        if(tem > 40) tem = 40;
+    }
+    if(wenb == '1')
+    {
+        tem = tem - 1;
+        if(tem < 20) tem = 20;
+    }
+    
+    // 烟雾阈值远程调节
+    if(yan1 == '1')
+    {
+        yan = yan + 1;
+        if(yan > 80) yan = 80;
+    }
+    if(yan2 == '1')
+    {
+        yan = yan - 1;
+        if(yan < 20) yan = 20;
+    }
+    
+    // CO阈值远程调节
+    if(rana == '1')
+    {
+        ran = ran + 1;
+        if(ran > 80) ran = 80;
+    }
+    if(ranb == '1')
+    {
+        ran = ran - 1;
+        if(ran < 20) ran = 20;
+    }
+    
+    // 远程设备控制（保持原有功能）
+    if(feng == '1')
+        fengkai();
+    else if(feng == '0')
+        fengguan();
+        
+    if(shui == '1')
+        shuikai();
+    else if(shui == '0')
+        shuiguan();
+        
+    if(bao == '1')
+        BEEP = 1;
+    else if(bao == '0')
+        BEEP = 0;
+        
+    if(fa == '1' && flag6 == 0)
+    {
+        Servo_SetAngle(180);
+        flag6 = 1;
+    }
+    else if(fa == '0' && flag6 == 1)
+    {
+        Servo_SetAngle(0);
+        flag6 = 0;
+    }
+}
        
 /// 报警检测和自动控制
 // 火灾检测控制水泵
