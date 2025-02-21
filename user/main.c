@@ -58,7 +58,8 @@ uint8_t fa='0';// 窗户（舵机）控制位
 uint8_t rana='0';// 燃气co阈值增加控制位
 uint8_t ranb='0';  // 燃气co阈值减少控制位
 uint8_t display_page = 0;
-
+static uint8_t auto_fan_state = 0;    // 风扇自动控制状态
+static uint8_t auto_pump_state = 0;   // 水泵自动控制状态
 #define WZ DHT11_Data.temp_int	
 #define WX DHT11_Data.temp_deci
 #define SZ DHT11_Data.humi_int	
@@ -116,7 +117,26 @@ void Display_Page3(void)
     
     // 页面指示
     OLED_ShowString(95, 0, "P:3/3", OLED_8X16);
+	
 }
+//第四页
+void Display_Page4(void)
+{
+    OLED_Clear();
+    // 显示阈值信息
+    OLED_ShowChinese(0, 0, "温度:");
+    OLED_ShowNum(64, 0, tem, 2, OLED_8X16);
+
+    OLED_ShowChinese(0, 16, "烟雾:");
+    OLED_ShowNum(64, 16, yan, 2, OLED_8X16);
+
+    OLED_ShowString(0, 32, "CO:", OLED_8X16);
+    OLED_ShowNum(64, 32, ran, 2, OLED_8X16);
+
+    // 页面指示
+    OLED_ShowString(95, 0, "P:4/4", OLED_8X16);
+}
+
 int main(void)
 {   
 	    // 初始化外设
@@ -160,95 +180,113 @@ int main(void)
 		Read_DHT11(&DHT11_Data);
 		
         // 按键切换模式
-         if(key)
-        {
-            switch(key)
+         
+	// 按键处理
+if(key)
+{
+    switch(key)
+    {
+        case KEY0_PRES:  // 按键1：同时控制风扇和窗户
+            auto_fan_state = 0;  // 清除自动控制状态
+            feng = (feng == '0') ? '1' : '0';
+            fa = feng;  // 窗户状态跟随风扇状态
+            if(feng == '1')
             {
-                case KEY0_PRES:  // 按键1：风扇控制
-                    feng = (feng == '0') ? '1' : '0';
-                    if(feng == '1')
-                        fengkai();
-                    else
-                        fengguan();
-                    break;
-                    
-                case KEY1_PRES:  // 按键2：水泵控制
-                    shui = (shui == '0') ? '1' : '0';
-                    if(shui == '1')
-                        shuikai();
-                    else
-                        shuiguan();
-                    break;
-                    
-                case KEY2_PRES:  // 按键3：窗户控制
-                    fa = (fa == '0') ? '1' : '0';
-                    if(fa == '1')
-                        Servo_SetAngle(180);
-                    else
-                        Servo_SetAngle(0);
-                    break;
-                    
-                case KEY3_PRES:  // 按键4：翻页
-                    display_page = (display_page + 1) % 3;
-                    break;
+                fengkai();           // 开启风扇
+                Servo_SetAngle(180); // 打开窗户
             }
-        }
-        
+            else
+            {
+                fengguan();         // 关闭风扇
+                Servo_SetAngle(0);  // 关闭窗户
+            }
+            break;
+            
+        case KEY1_PRES:  // 按键2：控制水泵
+            auto_pump_state = 0;  // 清除自动控制状态
+            shui = (shui == '0') ? '1' : '0';
+            if(shui == '1')
+                shuikai();
+            else
+                shuiguan();
+            break;
+            
+        case KEY3_PRES:  // 按键4：翻页显示
+            display_page = (display_page + 1) % 4;  // 改为4页循环
+            break;
+    }
+}
+				
+				
+				
         // 根据页面显示不同内容
-        switch(display_page)
-        {
-            case 0:
-                Display_Page1();
-                break;
-            case 1:
-                Display_Page2();
-                break;
-            case 2:
-                Display_Page3();
-                break;
-        }
+       switch(display_page)
+{
+    case 0:
+        Display_Page1();
+        break;
+    case 1:
+        Display_Page2();
+        break;
+    case 2:
+        Display_Page3();
+        break;
+    case 3:
+        Display_Page4();  // 新增的第4页
+        break;
+}
+
         
         // 报警检测和自动控制
        
-if(fire || MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
+/// 报警检测和自动控制
+// 火灾检测控制水泵
+if(fire) 
 {
-    BEEP = 1;  // 开启蜂鸣器
-    
-    // 火灾时开启水泵
-    if(fire)
+    BEEP = 1;           // 开启蜂鸣器
+    if(!auto_pump_state)  // 如果不是已经自动开启
     {
-        shuikai();    // 开启水泵
-        shui = '1';   // 更新水泵状态
-    }
-    
-    // 烟雾或CO浓度或温度超标时开启风扇和窗户
-    if(MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
-    {
-        fengkai();          // 开启风扇
-        feng = '1';         // 更新风扇状态
-        Servo_SetAngle(180);// 打开窗户
-        fa = '1';           // 更新窗户状态
+        shuikai();        // 开启水泵
+        shui = '1';       // 更新水泵状态
+        auto_pump_state = 1; // 标记为自动开启
     }
 }
-else
+else  // 火灾解除
 {
-    BEEP = 0;   // 关闭蜂鸣器
-	// 如果所有参数都恢复正常，则关闭所有设备
-    if(!fire && MQ2_Value <= yan && MQ7_Value <= ran && DHT11_Data.temp_int <= tem)
+    if(auto_pump_state)  // 如果是自动开启的水泵
     {
-        // 关闭水泵
-        shuiguan();
-        shui = '0';
-        
-        // 关闭风扇
-        fengguan();
-        feng = '0';
-        
-        // 关闭窗户
-        Servo_SetAngle(0);
-        fa = '0';
+        shuiguan();       // 关闭水泵
+        shui = '0';       // 更新水泵状态
+        auto_pump_state = 0; // 清除自动标记
     }
 }
+
+// 烟雾、CO浓度或温度检测控制风扇和窗户
+if(MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
+{
+    BEEP = 1;             // 开启蜂鸣器
+    if(!auto_fan_state)   // 如果不是已经自动开启
+    {
+        fengkai();           // 开启风扇
+        feng = '1';          // 更新风扇状态
+        Servo_SetAngle(180); // 打开窗户
+        fa = '1';            // 更新窗户状态
+        auto_fan_state = 1;  // 标记为自动开启
+    }
+}
+else  // 参数恢复正常
+{
+    if(auto_fan_state)    // 如果是自动开启的风扇和窗户
+    {
+        fengguan();          // 关闭风扇
+        feng = '0';          // 更新风扇状态
+        Servo_SetAngle(0);   // 关闭窗户
+        fa = '0';            // 更新窗户状态
+        auto_fan_state = 0;  // 清除自动标记
+        BEEP = 0;            // 关闭蜂鸣器
+    }
+}
+
 
         
         // WiFi数据上报
