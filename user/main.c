@@ -233,7 +233,23 @@ if(fire || MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
 else
 {
     BEEP = 0;   // 关闭蜂鸣器
+	// 如果所有参数都恢复正常，则关闭所有设备
+    if(!fire && MQ2_Value <= yan && MQ7_Value <= ran && DHT11_Data.temp_int <= tem)
+    {
+        // 关闭水泵
+        shuiguan();
+        shui = '0';
+        
+        // 关闭风扇
+        fengguan();
+        feng = '0';
+        
+        // 关闭窗户
+        Servo_SetAngle(0);
+        fa = '0';
+    }
 }
+
         
         // WiFi数据上报
         if(!Judge)
