@@ -107,7 +107,7 @@ void Display_Page3(void)
 {
     OLED_Clear();
     // 火焰状态
-    OLED_ShowChinese(0, 0, "火焰:");
+    OLED_ShowChinese(0, 0, "火:");
     OLED_ShowString(40, 0, fire ? "WARNING" : "NORMAL", OLED_8X16);
     
     // 控制状态
@@ -156,8 +156,9 @@ int main(void)
         MQ2_Value=Get_Adc_Average1(ADC_Channel_3,10)*100/4095;//模拟烟雾浓度的值
         MQ7_Value=Get_Adc_Average1(ADC_Channel_1,10)*100/4095;//模拟co浓度的值
         key = KEY_Scan(0);
-        Read_DHT11(&DHT11_Data);
-
+       
+		Read_DHT11(&DHT11_Data);
+		
         // 按键切换模式
          if(key)
         {
@@ -208,26 +209,31 @@ int main(void)
         }
         
         // 报警检测和自动控制
-        if(fire || MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
-        {
-            BEEP = 1;
-            if(fire || MQ2_Value > yan)
-            {
-                shuikai();
-                shui = '1';
-            }
-            if(MQ7_Value > ran || DHT11_Data.temp_int > tem)
-            {
-                fengkai();
-                Servo_SetAngle(180);
-                feng = '1';
-                fa = '1';
-            }
-        }
-        else
-        {
-            BEEP = 0;
-        }
+       
+if(fire || MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
+{
+    BEEP = 1;  // 开启蜂鸣器
+    
+    // 火灾时开启水泵
+    if(fire)
+    {
+        shuikai();    // 开启水泵
+        shui = '1';   // 更新水泵状态
+    }
+    
+    // 烟雾或CO浓度或温度超标时开启风扇和窗户
+    if(MQ2_Value > yan || MQ7_Value > ran || DHT11_Data.temp_int > tem)
+    {
+        fengkai();          // 开启风扇
+        feng = '1';         // 更新风扇状态
+        Servo_SetAngle(180);// 打开窗户
+        fa = '1';           // 更新窗户状态
+    }
+}
+else
+{
+    BEEP = 0;   // 关闭蜂鸣器
+}
         
         // WiFi数据上报
         if(!Judge)
